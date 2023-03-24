@@ -15,6 +15,14 @@ local speedmod_def = {
 	M = { upper=2000, increment=5 }
 }
 
+if SL.Global.GameMode == "DDR" then
+	speedmod_def = {
+		X = { upper=8, increment=0.25 },
+		C = { upper=2000, increment=25 },
+		M = { upper=2000, increment=25 }
+	}
+end
+
 local song = GAMESTATE:GetCurrentSong()
 
 ------------------------------------------------------------

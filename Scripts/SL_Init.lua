@@ -207,6 +207,14 @@ SL = {
 			color("#b45cff"),	-- purple (greatly lightened)
 			color("#ff3030")	-- red (slightly lightened)
 		},
+		DDR = {
+			color("#fcf7c7"),	-- white
+			color("#e6df15"),	-- yellow
+			color("#4dce41"),	-- green
+			color("#52a2f1"),	-- blue
+			color("#be54f0"),	-- purple
+			color("#ff0000")	-- red
+		},
 	},
 	Preferences = {
 		Casual = {
@@ -274,6 +282,26 @@ SL = {
 			-- https://github.com/stepmania/stepmania/issues/1896
 			-- it's as good as "fixed" for the very very large majority of
 			-- cases so we can set this back to 70ms now.
+			TimingWindowSecondsMine=0.070000,
+			TimingWindowSecondsRoll=0.350000,
+		},
+		DDR = {
+			TimingWindowAdd=0.0015,
+			RegenComboAfterMiss=5,
+			MaxRegenComboAfterMiss=10,
+			MinTNSToHideNotes="TapNoteScore_W3",
+			HarshHotLifePenalty=true,
+
+			PercentageScoring=true,
+			AllowW1="AllowW1_Everywhere",
+			SubSortByNumSteps=true,
+
+			TimingWindowSecondsW1=0.017000,
+			TimingWindowSecondsW2=0.034000,
+			TimingWindowSecondsW3=0.084000,
+			TimingWindowSecondsW4=0.124000,
+			TimingWindowSecondsW5=0.160000,
+			TimingWindowSecondsHold=0.320000,
 			TimingWindowSecondsMine=0.070000,
 			TimingWindowSecondsRoll=0.350000,
 		},
@@ -391,6 +419,41 @@ SL = {
 			LifePercentChangeLetGo=IsGame("pump") and 0.000 or -0.080,
 			LifePercentChangeHeld=IsGame("pump") and 0.000 or 0.008,
 			LifePercentChangeHitMine=-0.05,
+
+			InitialValue=0.5,
+		},
+		DDR = {
+			PercentScoreWeightW1=500,
+			PercentScoreWeightW2=497,
+			PercentScoreWeightW3=297,
+			PercentScoreWeightW4=97,
+			PercentScoreWeightW5=0,
+			PercentScoreWeightMiss=0,
+			PercentScoreWeightLetGo=0,
+			PercentScoreWeightHeld=IsGame("pump") and 0 or 500,
+			PercentScoreWeightHitMine=-500,
+			PercentScoreWeightCheckpointHit=0,
+
+			GradeWeightW1=500,
+			GradeWeightW2=497,
+			GradeWeightW3=297,
+			GradeWeightW4=97,
+			GradeWeightW5=0,
+			GradeWeightMiss=0,
+			GradeWeightLetGo=0,
+			GradeWeightHeld=IsGame("pump") and 0 or 500,
+			GradeWeightHitMine=-500,
+			GradeWeightCheckpointHit=0,
+
+			LifePercentChangeW1=0.012,
+			LifePercentChangeW2=0.010,
+			LifePercentChangeW3=0.008,
+			LifePercentChangeW4=0.002,
+			LifePercentChangeW5=-0.080,
+			LifePercentChangeMiss=-0.080,
+			LifePercentChangeLetGo=IsGame("pump") and 0.000 or -0.080,
+			LifePercentChangeHeld=IsGame("pump") and 0.000 or 0.012,
+			LifePercentChangeHitMine=-0.080,
 
 			InitialValue=0.5,
 		},

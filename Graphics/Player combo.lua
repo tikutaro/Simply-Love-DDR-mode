@@ -24,6 +24,14 @@ if SL.Global.GameMode == "FA+" then
 	colors.FullComboW4 = {color("#C9FFC9"), color("#94FEC1")} -- green combo
 end
 
+-- combo colors used in DDR
+if SL.Global.GameMode == "DDR" then
+	colors.FullComboW1 = {color("#FFFFFF"), color("#FCF7C7")} -- white combo
+	colors.FullComboW2 = {color("#FFFC8C"), color("#E6DF15")} -- gold combo
+	colors.FullComboW3 = {color("#6FF75B"), color("#2EAC28")} -- green combo
+	colors.FullComboW4 = {color("#78B8F8"), color("#1586F8")} -- blue combo
+end
+
 
 local ShowComboAt = THEME:GetMetric("Combo", "ShowComboAt")
 

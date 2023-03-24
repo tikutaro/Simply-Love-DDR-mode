@@ -140,14 +140,20 @@ bmt.SetScoreCommand=function(self, params)
 	-- have a GetLifeMeter() method.
 	if topscreen.GetLifeMeter == nil then return end
 
+	-- change the threshold if gamemode is DDR
+	undesirable_threshold = 10
+	if SL.Global.GameMode == "DDR" then
+		undesirable_threshold = 50
+	end
+
 	-- if this is an undesirable judgment AND we can still count up AND it's not a dropped hold
 	if tns == undesirable_judgment
 	and not received_judgment_lower_than_desired
-	and undesirable_judgment_count < 10
+	and undesirable_judgment_count < undesirable_threshold
 	and (hns ~= "LetGo") then
 		-- if this is the tail of a hold note, don't double count it
 		if not hns then
-			-- increment for the first ten
+			-- increment up to the threshold
 			undesirable_judgment_count = undesirable_judgment_count + 1
 			-- and specify literal W2 count
 			self:settext("-" .. undesirable_judgment_count)

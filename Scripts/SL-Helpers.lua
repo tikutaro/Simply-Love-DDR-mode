@@ -192,7 +192,7 @@ GetComboThreshold = function( MaintainOrContinue )
 
 	-- handle FA+ for Dance
 	-- should these values change for Pump?  I guess that's up to me.
-	if SL.Global.GameMode=="FA+" then
+	if SL.Global.GameMode=="FA+" or SL.Global.GameMode=="DDR" then
 		Combo.dance.Maintain = "TapNoteScore_W4"
 		Combo.dance.Continue = "TapNoteScore_W4"
 	end
@@ -358,6 +358,7 @@ SetGameModePreferences = function()
 	-- Thus, scores from FA+ mode will continue to go into ECFA-Stats.xml.
 	prefix["FA+"] = "ECFA-"
 	prefix["Casual"] = "Casual-"
+	prefix["DDR"] = "DDR-"
 
 	if PROFILEMAN:GetStatsPrefix() ~= prefix[SL.Global.GameMode] then
 		PROFILEMAN:SetStatsPrefix(prefix[SL.Global.GameMode])
