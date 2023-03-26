@@ -289,7 +289,7 @@ SL = {
 			TimingWindowAdd=0.0015,
 			RegenComboAfterMiss=5,
 			MaxRegenComboAfterMiss=10,
-			MinTNSToHideNotes="TapNoteScore_W3",
+			MinTNSToHideNotes="TapNoteScore_W4",
 			HarshHotLifePenalty=true,
 
 			PercentageScoring=true,
