@@ -21,6 +21,8 @@ local permitted_profile_settings = {
 	ComboFont        = "string",
 	HoldJudgment     = "string",
 	BackgroundFilter = "string",
+	NoteFieldOffsetX = "number",
+	NoteFieldOffsetY = "number",
 
 	----------------------------------
 	-- "Advanced Modifiers"
@@ -47,7 +49,6 @@ local permitted_profile_settings = {
 	ColumnFlashOnMiss    = "boolean",
 	SubtractiveScoring   = "boolean",
 	Pacemaker            = "boolean",
-	MissBecauseHeld      = "boolean",
 	NPSGraphAtTop        = "boolean",
 	JudgmentTilt         = "boolean",
 	ColumnCues           = "boolean",
@@ -56,11 +57,11 @@ local permitted_profile_settings = {
 	ErrorBar             = "string",
 	ErrorBarUp           = "boolean",
 	ErrorBarMultiTick    = "boolean",
-	ErrorBarTrim         = "boolean",
+	ErrorBarTrim         = "string",
 
-	ShowFaPlusWindow = "boolean",
-	ShowEXScore      = "boolean",
-	ShowFaPlusPane   = "boolean",
+	ShowFaPlusWindow     = "boolean",
+	ShowEXScore          = "boolean",
+	ShowFaPlusPane       = "boolean",
 
 	----------------------------------
 	-- Profile Settings without OptionRows
