@@ -58,6 +58,7 @@ local PlayerDefaults = {
 
 				-- Information parsed out from the chart.
 				NotesPerMeasure = {},
+				EquallySpacedPerMeasure = {},
 				PeakNPS = 0,
 				NPSperMeasure = {},
 				columnCues = {},
@@ -133,6 +134,7 @@ local GlobalDefaults = {
 				ScreenNameEntry = ThemePrefs.Get("ScreenNameEntryMenuTimer"),
 			}
 			self.TimeAtSessionStart = nil
+			self.SampleMusicLoops = ThemePrefs.Get("SampleMusicLoops")
 
 			self.GameplayReloadCheck = false
 			-- How long to wait before displaying a "cue"
@@ -493,7 +495,7 @@ SL = {
 		-- *  and when GrooveStats backend is also      *
 		-- *   updated to properly consume this value.  *
 		-- **********************************************
-		ChartHashVersion = 3
+		ChartHashVersion = 3,
 	}
 }
 
