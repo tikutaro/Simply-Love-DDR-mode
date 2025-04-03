@@ -41,7 +41,6 @@ for profile in ivalues(profile_data) do
 end
 
 local AutoStyle = ThemePrefs.Get("AutoStyle")
-local mpn = GAMESTATE:GetMasterPlayerNumber()
 
 local Handle = {}
 
@@ -59,10 +58,25 @@ Handle.Start = function(event)
 		-- IsArcade() is defined in _fallback/Scripts/02 Utilities.lua
 		-- in CoinMode_Free, EnoughCreditsToJoin() will always return true
 		-- thankfully, EnoughCreditsToJoin() factors in Premium settings
-		if IsArcade() and not GAMESTATE:EnoughCreditsToJoin() then
-			-- play the InvalidChoice sound and don't go any further
-			MESSAGEMAN:Broadcast("InvalidChoice", {PlayerNumber=event.PlayerNumber})
-			return
+		if IsArcade() then
+			if not GAMESTATE:EnoughCreditsToJoin() then
+				-- play the InvalidChoice sound and don't go any further
+				MESSAGEMAN:Broadcast("InvalidChoice", {PlayerNumber=event.PlayerNumber})
+				return
+			else
+				if (not SL.Global.FastProfileSwitchInProgress and
+						GAMESTATE:GetCoinMode() == "CoinMode_Pay" and
+						(GAMESTATE:GetPremium() ~= "Premium_2PlayersFor1Credit" or
+						GAMESTATE:GetNumPlayersEnabled()==0)) then
+					-- Consume the credit if:
+					-- 1. This side is not joined
+					-- 2. We are not fast switching (i.e. in the SelectMusic screen)
+					-- 3. We are in coin mode
+					-- 4. EITHER Each side needs its own credits
+					--    OR neither side is currently joined
+					GAMESTATE:InsertCoin(-GAMESTATE:GetCoinsNeededToJoin())
+				end
+			end
 		end
 
 		-- unset the readyPlayers flag for this player since they now
@@ -97,6 +111,8 @@ Handle.Start = function(event)
 		MESSAGEMAN:Broadcast("SelectedProfile", {PlayerNumber=event.PlayerNumber})
 
 		if readyPlayers["P1"] and readyPlayers["P2"] then
+			-- Set finished to true so that we don't process any more input
+			finished = true	
 			-- if we're here, both players have selected a profile
 			-- play the StartButton sound
 			MESSAGEMAN:Broadcast("StartButton")
@@ -154,7 +170,17 @@ Handle.DownRight = Handle.MenuRight
 
 Handle.Back = function(event)
 	if GAMESTATE:GetNumPlayersEnabled()==0 then
-		SCREENMAN:GetTopScreen():Cancel()
+		if SL.Global.FastProfileSwitchInProgress then
+			-- Going back to the song wheel without any players connected doesn't
+			-- make much sense; disallow dismissing the ScreenSelectProfile
+			-- top screen until at least one player has joined in
+			MESSAGEMAN:Broadcast("PreventEscape")
+		else
+			-- On the other hand, dismissing the regular ScreenSelectProfile
+			-- (not in fast switch mode) is perfectly fine since we can just go
+			-- back to the previous screen
+			SCREENMAN:GetTopScreen():Cancel()
+		end
 	else
 		-- If the player is joined, has selected a profile but then pressed back, we
 		-- need to unset the readyPlayers flag and go back to the profile scoller.
@@ -168,6 +194,30 @@ Handle.Back = function(event)
 		
 		-- Otherwise they are unjoining.
 		MESSAGEMAN:Broadcast("BackButton", {PlayerNumber=event.PlayerNumber})
+
+		if (GAMESTATE:IsHumanPlayer(event.PlayerNumber) and
+				not SL.Global.FastProfileSwitchInProgress and
+				GAMESTATE:GetCoinMode() == "CoinMode_Pay" and
+			    (GAMESTATE:GetPremium() ~= "Premium_2PlayersFor1Credit" or
+				 GAMESTATE:GetNumPlayersEnabled()==1)) then
+			-- Refund credit if:
+			-- 1. This side is originally joined
+			-- 2. We are not fast switching (i.e. in the SelectMusic screen)
+			-- 3. We are in coin mode
+			-- 4. EITHER each side needs its own credits
+			--    OR we are about to have 0 players joined, thus refunding the original credit.
+			
+			-- We originally consumed the credit when the player joined, so we
+			-- should refund them if they unjoin.
+
+			-- Use the CoinsPerCredit over GetCoinsNeededToJoin because
+			-- it'll report 0 when going from 1 -> 0 players in
+			-- Premium_2PlayersFor1Credit mode since a side is currently
+			-- joined.
+			local coins = PREFSMAN:GetPreference("CoinsPerCredit")
+			GAMESTATE:InsertCoin(coins)
+		end
+		
 		-- set the readyPlayers flag for this player since they no longer
 		-- need to make a selection
 		readyPlayers[ToEnumShortString(event.PlayerNumber)] = true
@@ -176,6 +226,20 @@ Handle.Back = function(event)
 		-- "Unjoin this player and unmount their USB stick if there is one"
 		-- see ScreenSelectProfile.cpp for details
 		SCREENMAN:GetTopScreen():SetProfileIndex(event.PlayerNumber, -2)
+
+		-- CurrentStyle has to be explicitly set to single in order to be able to
+		-- unjoin a player from a 2-player setup
+		if SL.Global.FastProfileSwitchInProgress and GAMESTATE:GetNumSidesJoined() == 1 then
+			GAMESTATE:SetCurrentStyle("single")
+			-- If AutoStyle is single then someone had joined during gameplay
+			-- We need to explicitly remove this player's join frame
+			if (AutoStyle=="single") then
+				SCREENMAN:GetTopScreen():playcommand("Update", {player=event.PlayerNumber})
+			else
+				SCREENMAN:GetTopScreen():playcommand("Update")
+			end
+		end
+
 	end
 end
 Handle.Select = Handle.Back
@@ -184,7 +248,7 @@ Handle.Select = Handle.Back
 local InputHandler = function(event)
 	if finished then return false end
 	if not event or not event.button then return false end
-	if (AutoStyle=="single" or AutoStyle=="double") and event.PlayerNumber ~= mpn then return false	end
+	if (((AutoStyle=="single" or AutoStyle=="double") and #GAMESTATE:GetHumanPlayers() == 1) and event.PlayerNumber ~= GAMESTATE:GetMasterPlayerNumber()) then return false	end
 
 	if event.type ~= "InputEventType_Release" then
 		if Handle[event.GameButton] then Handle[event.GameButton](event) end

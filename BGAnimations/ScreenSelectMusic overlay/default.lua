@@ -5,7 +5,7 @@ local af = Def.ActorFrame{
 	-- time ScreenGameplay loads, it should have a properly animated entrance.
 	InitCommand=function(self)
 		SL.Global.GameplayReloadCheck = false
-
+		generateFavoritesForMusicWheel()
 		-- While other SM versions don't need this, Outfox resets the
 		-- the music rate to 1 between songs, but we want to be using
 		-- the preselected music rate.
@@ -13,11 +13,39 @@ local af = Def.ActorFrame{
 		songOptions:MusicRate(SL.Global.ActiveModifiers.MusicRate)
 	end,
 
+	PlayerProfileSetMessageCommand=function(self, params)
+		if not PROFILEMAN:IsPersistentProfile(params.Player) then
+			LoadGuest(params.Player)
+		end
+		generateFavoritesForMusicWheel()
+		ApplyMods(params.Player)
+	end,
+
+	PlayerJoinedMessageCommand=function(self, params)
+		if not PROFILEMAN:IsPersistentProfile(params.Player) then
+			LoadGuest(params.Player)
+		end
+		ApplyMods(params.Player)
+	end,
+	CodeMessageCommand=function(self, params)
+		if params.Name == "Favorite1" or params.Name == "Favorite2" then
+			addOrRemoveFavorite(params.PlayerNumber)
+		end
+	end,
+	ReloadScreenForMemoryCardsMessageCommand=function(self, params)
+		-- Wait some time for the profile screen to finish transitioning
+		-- before reloading the screen.
+		self:sleep(0.10):queuecommand("Reload")
+	end,
+	ReloadCommand=function(self)
+		SCREENMAN:GetTopScreen():SetNextScreenName("ScreenReloadSSM")
+		SCREENMAN:GetTopScreen():StartTransitioningScreen("SM_GoToNextScreen")
+	end,
 	-- ---------------------------------------------------
 	--  first, load files that contain no visual elements, just code that needs to run
 
-	-- MenuTimer code for preserving SSM's timer value when going
-	-- from SSM to Player Options and then back to SSM
+	-- MenuTimer code for preserving SSM's timer value when going 
+	-- from SSM to a different screen and back to SSM (i.e. returning from PlayerOptions).
 	LoadActor("./PreserveMenuTimer.lua"),
 	-- Apply player modifiers from profile
 	LoadActor("./PlayerModifiers.lua"),

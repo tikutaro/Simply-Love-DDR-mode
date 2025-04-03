@@ -1,8 +1,7 @@
 local NumEntries = 13
 local RowHeight = 24
-local RpgGreen = color("#009b7f")
-local RpgTextGreen = color("#00e6bc")
-local RpgTextBody = color("#d8e87c")
+local RpgYellow = color("#CDAA9B")
+local RpgText = Color.White
 local ItlPink = color("1,0.2,0.406,1")
 
 local paneWidth1Player = 330
@@ -12,16 +11,38 @@ local paneHeight = 360
 local borderWidth = 2
 
 local SetRpgStyle = function(eventAf)
-	eventAf:GetChild("MainBorder"):diffuse(RpgGreen)
+	eventAf:GetChild("MainBorder"):diffuse(RpgYellow)
 	eventAf:GetChild("BackgroundImage"):visible(true)
-	eventAf:GetChild("BackgroundColor"):diffuse(color("0,0,0,0.7"))
+	eventAf:GetChild("BackgroundColor"):diffuse(color("0,0,0.1,0.8"))
 	eventAf:GetChild("BackgroundColor2"):visible(true):diffuse(color("1,1,1,0.05")):faderight(0.1):fadeleft(0.1)
-	eventAf:GetChild("HeaderBorder"):diffuse(RpgGreen)
-	eventAf:GetChild("HeaderBackground"):diffusetopedge(color("#033c2f")):diffusebottomedge(color("#1c6f4c"))
-	eventAf:GetChild("Header"):diffuse(color("#a2e87c"))
+	eventAf:GetChild("HeaderBorder"):diffuse(RpgYellow)
+	
+	local idx = SL.Global.ActiveColorIndex
+	local faction_name = SL.SRPG8.GetFactionName(idx)
+
+	if faction_name == "Stamina Nation" then
+		eventAf:GetChild("HeaderBackground")
+				:diffusetopedge(color("#523328"))
+				:diffusebottomedge(color("#815354"))
+	elseif faction_name == "Democratic People's Republic of Timing" then
+		eventAf:GetChild("HeaderBackground")
+				:diffusetopedge(color("#15313D"))
+				:diffusebottomedge(color("#34605D"))
+    elseif faction_name == "Footspeed Empire" then
+		eventAf:GetChild("HeaderBackground")
+				:diffusetopedge(color("#412147"))
+				:diffusebottomedge(color("#634B80"))
+	else
+		-- "Unaffiliated"
+		eventAf:GetChild("HeaderBackground")
+				:diffusetopedge(color("#14362D"))
+				:diffusebottomedge(color("#376648"))
+	end
+
+	eventAf:GetChild("Header"):diffuse(RpgText)
 	eventAf:GetChild("EX"):visible(false)
 	eventAf:GetChild("BodyText"):diffuse(Color.White)
-	eventAf:GetChild("PaneIcons"):GetChild("Text"):diffuse(RpgGreen)
+	eventAf:GetChild("PaneIcons"):GetChild("Text"):diffuse(RpgText)
 
 	local leaderboard = eventAf:GetChild("Leaderboard")
 	for i=1, NumEntries do
@@ -80,14 +101,14 @@ local BannerAndSong = function(x, y, zoom)
 					self:LoadFromSong( GAMESTATE:GetCurrentSong() )
 				end
 			end
-			self:setsize(418, 164)
+			self:setsize(418, 164):animate(false) 
 		end
 	}
 	af[#af+1] = LoadFont("Common Normal")..{
 		Name="SongName",
 		InitCommand=function(self)
 			local songtitle = (GAMESTATE:IsCourseMode() and GAMESTATE:GetCurrentCourse():GetDisplayFullTitle()) or GAMESTATE:GetCurrentSong():GetDisplayFullTitle()
-			if songtitle then self:settext(songtitle):zoom(1.5):maxwidth(500):vertalign("top"):y(90) end
+			if songtitle then self:settext(songtitle):zoom(2):maxwidth(500):vertalign("top"):y(90):diffuse(color("1,0.972,0.792,1")) end
 		end
 	}
 	
@@ -104,6 +125,8 @@ local SetEntryText = function(rank, name, score, date, actor)
 end
 
 local SetLeaderboardData = function(eventAf, leaderboardData, event)
+	if leaderboardData == nil then return end
+
 	local entryNum = 1
 	local rivalNum = 1
 	local leaderboard = eventAf:GetChild("Leaderboard")
@@ -122,7 +145,7 @@ local SetLeaderboardData = function(eventAf, leaderboardData, event)
 			gsEntry["rank"]..".",
 			gsEntry["name"],
 			string.format("%.2f%%", gsEntry["score"]/100),
-			ParseGroovestatsDate(gsEntry["date"]),
+			ParseGrooveStatsDate(gsEntry["date"]),
 			entry
 		)
 		if gsEntry["isRival"] then
@@ -273,7 +296,6 @@ local GetRpgPaneFunctions = function(eventAf, rpgData, player)
 				bodyText:zoom(zoomVal)
 				bodyText:wrapwidthpixels(paneWidth/(zoomVal))
 				bodyText:settext(text):visible(true)
-				Trace(bodyText:GetHeight() * zoomVal)
 				if bodyText:GetHeight() * zoomVal <= paneHeight - RowHeight*1.5 then
 					break
 				end
@@ -291,7 +313,7 @@ local GetRpgPaneFunctions = function(eventAf, rpgData, player)
 				-- Extract the actual numeric text.
 				local substring = string.sub(text, i, j)
 
-				local clr = RpgTextGreen
+				local clr = Color.Green
 
 				-- Except negatives should be red.
 				if substring:sub(1, 1) == "-" then
@@ -323,7 +345,7 @@ local GetRpgPaneFunctions = function(eventAf, rpgData, player)
 
 				bodyText:AddAttribute(i-1, {
 					Length=#substring,
-					Diffuse=RpgTextGreen
+					Diffuse=Color.Green
 				})
 
 				offset = j + 1
@@ -353,30 +375,11 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 	local steps = GAMESTATE:GetCurrentSteps(player)
 	local chartName = steps:GetChartName()
 
-	local maxPoints = 0
-	local hash = SL[pn].Streams.Hash
-	if itlData["maxPoints"] ~= nil then
-		-- First try and fetch the maxPoints from the response.
-		maxPoints = itlData["maxPoints"]
-	elseif SL[pn].ITLData["hashMap"][hash] ~= nil then
-		-- Then if it doesn't exist, try and parse it from ITL hashMap
-		maxPoints = SL[pn].ITLData["hashMap"][hash]["maxPoints"]
-	else
-		-- Then if it still doesn't exist, try and parse it from the chartName.
-
-		-- Note that playing OUTSIDE of the ITL pack will result in 0 points for all
-		-- upscores since it won't have the relevant points data.
-		local pointsStr = chartName:gsub(" pts", "")
-		maxPoints = tonumber(pointsStr)
-	end
-
-	if maxPoints == nil then
-		maxPoints = 0
-	end
-
-	local currentPoints = GetITLPointsForSong(maxPoints, score)
-	local previousPoints = itlData["topScorePoints"]
+	local currentPoints = itlData["topScorePoints"]
+	local previousPoints = itlData["prevTopScorePoints"]
 	local pointDelta = currentPoints - previousPoints
+
+	local totalPasses = itlData["totalPasses"]
 
 	local currentRankingPointTotal = itlData["currentRankingPointTotal"]
 	local previousRankingPointTotal = itlData["previousRankingPointTotal"]
@@ -417,7 +420,8 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 				["currentExPointTotal"] = currentExPointTotal,
 				["totalExDelta"] = totalExDelta,
 				["currentPointTotal"] = currentPointTotal,
-				["totalDelta"] = totalDelta
+				["totalDelta"] = totalDelta,
+				["totalPasses"] = totalPasses,
 			},
 		})
 	end
@@ -425,6 +429,7 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 
 	local statImprovements = {}
 	local quests = {}
+	local achievements = {}
 	local progress = itlData["progress"]
 	if progress then
 		if progress["statImprovements"] then
@@ -501,6 +506,43 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 				table.insert(quests, table.concat(questStrings, "\n"))
 			end
 		end
+
+		if progress["achievementsCompleted"] then
+			for achievement in ivalues(progress["achievementsCompleted"]) do
+				local achievementStrings = {}
+				table.insert(achievementStrings, string.format(
+					"Completed the \"%s\" Achievement!\n",
+					achievement["title"]
+				))
+
+				for reward in ivalues(achievement["rewards"]) do
+					local tier = reward["tier"]
+					if tier ~= "Default" then
+						table.insert(achievementStrings, string.format(
+							"\"%s\" Tier",
+							tier
+						))
+					end
+
+					for requirement in ivalues(reward["requirements"]) do
+						table.insert(achievementStrings, string.format(
+							"%s",
+							requirement
+						))
+					end
+
+					if reward["titleUnlocked"] then
+						table.insert(achievementStrings, string.format(
+							"Unlocked the \"%s\" Title!",
+							reward["titleUnlocked"]
+						))
+					end
+					table.insert(achievementStrings, "")
+				end
+
+				table.insert(achievements, table.concat(achievementStrings, "\n"))
+			end
+		end
 	end
 
 	table.insert(paneTexts, string.format(
@@ -510,6 +552,7 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 		"Song Points: %d (%+d)\n"..
 		"EX Points: %d (%+d)\n"..
 		"Total Points: %d (%+d)\n\n"..
+		"You've passed the chart %d times\n\n"..
 		"%s",
 		score, scoreDelta,
 		currentPoints, pointDelta,
@@ -517,11 +560,16 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 		currentSongPointTotal, totalSongDelta,
 		currentExPointTotal, totalExDelta,
 		currentPointTotal, totalDelta,
+		totalPasses,
 		#statImprovements == 0 and "" or table.concat(statImprovements, "\n").."\n\n"
 	))
 
 	for quest in ivalues(quests) do
 		table.insert(paneTexts, quest)
+	end
+
+	for achievement in ivalues(achievements) do
+		table.insert(paneTexts, achievement)
 	end
 
 	for text in ivalues(paneTexts) do
@@ -576,8 +624,15 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 				offset = j + 1
 			end
 
-			offset = 0
+			-- Have special coloring for the quoted tiers.
+			local tierMap = {
+				["Bronze"] = color("#966832"),
+				["Silver"] = color("#A1AEC1"),
+				["Gold"] = color("#F6AB2D"),
+				["Prismatic"] = color("#8731D2"),
+			}
 
+			offset = 0
 			while offset <= #text do
 				-- Search for all quoted strings.
 				local i, j = string.find(text, "\".-\"", offset)
@@ -587,11 +642,18 @@ local GetItlPaneFunctions = function(eventAf, itlData, player)
 				end
 				-- Extract the actual quoted text.
 				local substring = string.sub(text, i, j)
-
-				bodyText:AddAttribute(i-1, {
-					Length=#substring,
-					Diffuse=Color.Green
-				})
+				local text = string.sub(substring, 2, #substring-1)
+				if tierMap[text] ~= nil then
+					bodyText:AddAttribute(i-1, {
+						Length=#substring,
+						Diffuse=tierMap[text]
+					})
+				else
+					bodyText:AddAttribute(i-1, {
+						Length=#substring,
+						Diffuse=Color.Green
+					})
+				end
 
 				offset = j + 1
 			end
@@ -770,7 +832,7 @@ for player in ivalues(PlayerNumber) do
 		-- Main Black cement background
 		Def.Sprite {
 			Name="BackgroundImage",
-			Texture=THEME:GetPathG("", "_VisualStyles/SRPG7/Overlay-BG.png"),
+			Texture=THEME:GetPathG("", "_VisualStyles/SRPG8/Overlay-BG.jpg"),
 			InitCommand=function(self)
 				self:CropTo(paneWidth, paneHeight)
 			end

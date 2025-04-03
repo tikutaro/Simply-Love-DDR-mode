@@ -33,7 +33,7 @@ end
 -- that expect it to behave a particular way.
 
 SL_WideScale = function(AR4_3, AR16_9)
-	return clamp(scale( SCREEN_WIDTH, 640, 854, AR4_3, AR16_9 ), AR4_3, AR16_9)
+	return clamp(scale( SCREEN_WIDTH, 640, 854, AR4_3, AR16_9 ), math.min(AR4_3, AR16_9), math.max(AR4_3, AR16_9))
 end
 
 
@@ -331,16 +331,16 @@ SetGameModePreferences = function()
 	end
 
 	--------------------------------------------
-	-- If we're switching to Casual mode,
-	-- we want to reduce the number of judgments,
-	-- so turn Decents and WayOffs off now.
-	if SL.Global.GameMode == "Casual" then
-		SL.Global.ActiveModifiers.TimingWindows = {true,true,true,false,false}
-	end
-
-	--------------------------------------------
 	-- loop through human players and apply whatever mods need to be set now
 	for player in ivalues(GAMESTATE:GetHumanPlayers()) do
+		local pn = ToEnumShortString(player)
+		-- If we're switching to Casual mode,
+		-- we want to reduce the number of judgments,
+		-- so turn Decents and WayOffs off now.
+		if SL.Global.GameMode == "Casual" then
+			SL[pn].ActiveModifiers.TimingWindows = {true,true,true,false,false}
+		end
+
 		-- Now that we've set the SL table for TimingWindows appropriately,
 		-- use it to apply TimingWindows.
 		local TW_OptRow = CustomOptionRow( "TimingWindows" )
@@ -665,7 +665,7 @@ GetExJudgmentCounts = function(player)
 			-- For the last window (Decent) in FA+ mode...
 			if window == "W5" then
 				-- Only populate if the window is still active.
-				if SL.Global.ActiveModifiers.TimingWindows[5] then
+				if SL[pn].ActiveModifiers.TimingWindows[5] then
 					counts[adjusted_window] = number
 				end
 			else
@@ -687,8 +687,8 @@ GetExJudgmentCounts = function(player)
 			else
 				if ((window ~= "W4" and window ~= "W5") or
 						-- Only populate decent and way off windows if they're active.
-						(window == "W4" and SL.Global.ActiveModifiers.TimingWindows[4]) or
-						(window == "W5" and SL.Global.ActiveModifiers.TimingWindows[5])) then
+						(window == "W4" and SL[pn].ActiveModifiers.TimingWindows[4]) or
+						(window == "W5" and SL[pn].ActiveModifiers.TimingWindows[5])) then
 					counts[window] = number
 				end
 			end
@@ -811,6 +811,8 @@ GetColumnMapping = function(player)
 	local left = po:Left()
 	local right = po:Right()
 	local mirror = po:Mirror()
+	local udmirror = po:UDMirror()
+	local lrmirror = po:LRMirror()
 
 	-- Combining flip and invert results in unusual spacing so ignore it.
 	if flip and invert then
@@ -855,14 +857,27 @@ GetColumnMapping = function(player)
 		column_mapping = {column_mapping[4], column_mapping[3], column_mapping[2], column_mapping[1]}
 	end
 
+	if udmirror then
+		column_mapping = {column_mapping[1], column_mapping[3], column_mapping[2], column_mapping[4]}
+	end
+
+	if lrmirror then
+		column_mapping = {column_mapping[4], column_mapping[2], column_mapping[3], column_mapping[1]}
+	end
+
 	if num_columns == 8 then
 		for i=1,4 do
 			column_mapping[4+i] = column_mapping[i] + 4
 		end
 
-		-- We only need to apply the following if exactly one of flip or mirror is active
-		-- since they otherwise cancel each other out
-		if (not flip and mirror) or (flip and not mirror) then
+		-- Flip, Mirror. and LRMirror all swap left and right sides.
+		-- If an odd number of them are set then swap.
+		local swapCount = 0
+		if flip then swapCount = swapCount + 1 end
+		if mirror then swapCount = swapCount + 1 end
+		if lrmirror then swapCount = swapCount + 1 end
+
+		if swapCount % 2 == 1 then
 			for i=1,4 do
 				column_mapping[i] = column_mapping[i] + 4
 				column_mapping[i+4] = column_mapping[i+4] - 4
@@ -919,9 +934,10 @@ end
 
 -- -----------------------------------------------------------------------
 -- Returns a stringified form of a player's selected options.
-GetPlayerOptionsString = function(player)
+GetPlayerOptionsString = function(player, modsLevel)
+	local modsLevel = modsLevel or "ModsLevel_Preferred"
 	-- grab the song options from this PlayerState
-	local PlayerOptions = GAMESTATE:GetPlayerState(player):GetPlayerOptionsArray("ModsLevel_Preferred")
+	local PlayerOptions = GAMESTATE:GetPlayerState(player):GetPlayerOptionsArray(modsLevel)
 	local pn = ToEnumShortString(player)
 
 	-- start with an empty string...
@@ -937,7 +953,8 @@ GetPlayerOptionsString = function(player)
 	for i,option in ipairs(PlayerOptions) do
 
 		-- these don't need to show up in the mods list
-		if option ~= "FailAtEnd" and option ~= "FailImmediateContinue" and option ~= "FailImmediate" then
+		if option ~= "FailAtEnd" and option ~= "FailImmediateContinue" and option ~= "FailImmediate" and 
+			not string.find(option, "Lights") then
 			-- 100% Mini will be in the PlayerOptions as just "Mini" so use the value from the SL table instead
 			if option:match("Mini") then
 				option = SL[pn].ActiveModifiers.Mini .. " Mini"
@@ -963,6 +980,9 @@ GetPlayerOptionsString = function(player)
 
 	local substitutions = {
 		["SuperShuffle"] = "Blender",
+		["HyperShuffle"] = "Random",
+		["LRMirror"] = "LR-Mirror",
+		["UDMirror"] = "UD-Mirror",
 	}
 
 	for k,v in pairs(substitutions) do
@@ -970,4 +990,57 @@ GetPlayerOptionsString = function(player)
 	end
 
 	return optionslist
+end
+
+-- -----------------------------------------------------------------------
+-- helper function for returning the player AF
+-- Works as expected in ScreenGameplay + Edit + Practice Mode
+--     arguments:  pn is short string PlayerNumber like "P1" or "P2"
+--     returns:    the "PlayerP1" or "PlayerP2" ActorFrame in ScreenGameplay
+--                 or, the unnamed equivalent in ScrenEdit
+GetPlayerAF = function(pn)
+	local topscreen = SCREENMAN:GetTopScreen()
+	if not topscreen then
+		lua.ReportScriptError("GetPlayerAF() failed to find the player ActorFrame because there is no Screen yet.")
+		return nil
+	end
+
+	local playerAF = nil
+
+	-- Get the player ActorFrame on ScreenGameplay
+	-- It's a direct child of the screen and named "PlayerP1" for P1
+	-- and "PlayerP2" for P2.
+	-- This naming convention is hardcoded in the SM5 engine.
+	--
+	-- ScreenEdit does not name its player ActorFrame, but we can still find it.
+
+	-- find the player ActorFrame in edit mode
+	local notefields = {}
+	if (THEME:GetMetric(topscreen:GetName(), "Class") == "ScreenEdit") then
+		-- loop through all nameless children of topscreen
+		-- and find the one that contains the NoteField
+		-- which is thankfully still named "NoteField"1
+
+		for _,nameless_child in ipairs(topscreen:GetChild("")) do
+			if nameless_child:GetChild("NoteField") then
+				notefields[#notefields+1] = nameless_child
+			end
+		end
+		-- If there is only one side joined always return the first one.
+		if #notefields == 1 then
+			return notefields[1]
+		-- If there are two sides joined, return the one that matches the player number.
+		else
+			return notefields[pn == "P1" and 1 or 2]
+		end
+
+	-- find the player ActorFrame in gameplay
+	else
+		local player_af = topscreen:GetChild("Player"..pn)
+		if player_af then
+			playerAF = player_af
+		end
+	end
+
+	return playerAF
 end

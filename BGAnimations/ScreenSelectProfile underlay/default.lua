@@ -4,11 +4,6 @@
 -- SelectProfileFrames for both PLAYER_1 and PLAYER_2, but only the MasterPlayerNumber
 local AutoStyle = ThemePrefs.Get("AutoStyle")
 
--- retrieve the MasterPlayerNumber now, at initialization, so that if AutoStyle is set
--- to "single" or "double" and that singular player unjoins, we still have a handle on
--- which PlayerNumber they're supposed to be...
-local mpn = GAMESTATE:GetMasterPlayerNumber()
-
 -- a table of profile data (highscore name, most recent song, mods, etc.)
 -- indexed by "ProfileIndex" (provided by engine)
 local profile_data = LoadActor("./PlayerProfileData.lua")
@@ -22,7 +17,6 @@ local readyPlayers = {
 	["P1"] = false,
 	["P2"] = false,
 }
-
 -- ----------------------------------------------------
 
 local HandleStateChange = function(self, Player)
@@ -119,11 +113,6 @@ local t = Def.ActorFrame {
 		self:sleep(0.5):queuecommand("Finish")
 	end,
 	FinishCommand=function(self)
-		-- If either/both human players want to *not* use a local profile
-		-- (that is, they've chosen the first option, "[Guest]"), ScreenSelectProfile
-		-- will not let us leave.  The screen's Finish() method expects all human players
-		-- to have local profiles they want to use.  So, this gets tricky.
-		--
 		-- Loop through the enum for PlayerNumber that the engine has exposed to Lua.
 		for player in ivalues( PlayerNumber ) do
 			-- check if this player is joined in
@@ -139,6 +128,7 @@ local t = Def.ActorFrame {
 				--   0: use the USB memory card associated with this player
 				--  -1: join the player and play the theme's start sound effect
 				--  -2: unjoin the player, unlock their memorycard, and unmount their memorycard
+				--  -3: allow the user to play without a profile (USB or local)
 
 				-- check for and handle USB memorycards first
 				if MEMCARDMAN:GetCardState(player) ~= 'MemoryCardState_none' then
@@ -152,26 +142,26 @@ local t = Def.ActorFrame {
 				-- In this case, 0 is the index of the choice in the scroller.  It should not be confused the 0 passed to
 				-- SetProfileIndex() to use a USB memorycard which is a different stupid hardcoded number defined by the engine. D:
 				elseif index == 0 then
-					-- Passing a -2 to SetProfileIndex() will unjoin the player.
-					-- Temporarily unjoining this player is necessary to get us past this screen onto the next
-					-- because ScreenSelectProfile needs all human players to have profiles assigned to them.
-					SCREENMAN:GetTopScreen():SetProfileIndex(player, -2)
+					-- ScreenSelectProfile's Finish() method is hardcoded to assign DefaultProfileIDs
+					-- which will interfere with SL's notion of NOT requiring all players to use profiles.
+					-- If the player went out of their way to enable ScreenSelectProfile, they presumably want
+					-- to be able to pick, and picking (to me) means having an option for not-using-a-profile.
+					PREFSMAN:SetPreference("DefaultLocalProfileIDP1", "")
+					PREFSMAN:SetPreference("DefaultLocalProfileIDP2", "")
 
-					-- The engine considers this player to be unjoined, but the human person playing StepMania
-					-- just wanted to not use a profile.  Save this player object in the SL table.  We'll rejoin
-					-- the player without a profile at the Init of the next screen (ScreenAfterSelectProfile).
-					if SL.Global.PlayersToRejoin == nil then SL.Global.PlayersToRejoin = {} end
-					table.insert(SL.Global.PlayersToRejoin, player)
+					-- Passing -3 to SetProfileIndex() will allow the player to play without a profile
+					SCREENMAN:GetTopScreen():SetProfileIndex(player, -3)
 				end
 			end
 		end
 
-		-- if no available human players wanted to use a local profile, they will have been unjoined by now
-		-- and we won't be able to Finish() the screen without any joined players. If this happens, don't bother
-		-- trying to Finish(), just force StepMania to the next screen.
-		if type(SL.Global.PlayersToRejoin) == "table" then
-			if (#SL.Global.PlayersToRejoin == 1 and #GAMESTATE:GetHumanPlayers() == 0) or (#SL.Global.PlayersToRejoin == 2) then
-				SCREENMAN:SetNewScreen("ScreenAfterSelectProfile")
+		if SL.Global.FastProfileSwitchInProgress then
+			SL.Global.FastProfileSwitchInProgress = false
+			-- Check if one of the players has a memory card
+			-- If so, we need to reload the screen to update the profile data
+			-- Otherwise, we can just finish the screen
+			if MEMCARDMAN:GetCardState(PLAYER_1) ~= 'MemoryCardState_none' or MEMCARDMAN:GetCardState(PLAYER_2) ~= 'MemoryCardState_none' then
+				MESSAGEMAN:Broadcast("ReloadScreenForMemoryCards")
 			end
 		end
 		SCREENMAN:GetTopScreen():Finish()
@@ -181,7 +171,7 @@ local t = Def.ActorFrame {
 
 	CodeMessageCommand=function(self, params)
 
-		if (AutoStyle=="single" or AutoStyle=="double") and params.PlayerNumber ~= mpn then return end
+		if (AutoStyle=="single" or AutoStyle=="double" or #GAMESTATE:GetHumanPlayers() > 1 ) and params.PlayerNumber ~= GAMESTATE:GetMasterPlayerNumber()  then return end
 
 		-- Don't allow players to unjoin from SelectProfile in CoinMode_Pay.
 		-- 1 credit has already been deducted from ScreenTitleJoin, so allowing players
@@ -190,7 +180,24 @@ local t = Def.ActorFrame {
 
 		if params.Name == "Select" then
 			if GAMESTATE:GetNumPlayersEnabled()==0 then
-				SCREENMAN:GetTopScreen():Cancel()
+				if SL.Global.FastProfileSwitchInProgress then
+					-- Going back to the song wheel without any players connected doesn't
+					-- make much sense; disallow dismissing the ScreenSelectProfile
+					-- top screen until at least one player has joined in
+					MESSAGEMAN:Broadcast("PreventEscape")
+				else
+					-- On the other hand, dismissing the regular ScreenSelectProfile
+					-- (not in fast switch mode) is perfectly fine since we can just go
+					-- back to the previous screen
+					SCREENMAN:GetTopScreen():Cancel()
+				end
+			else
+				-- CurrentStyle has to be explicitly set to single in order to be able to
+				-- unjoin a player from a 2-player setup
+				if SL.Global.FastProfileSwitchInProgress and GAMESTATE:GetNumSidesJoined() == 1 then
+					GAMESTATE:SetCurrentStyle("single")
+					SCREENMAN:GetTopScreen():playcommand("Update")
+				end
 			end
 		end
 	end,
@@ -217,11 +224,11 @@ local t = Def.ActorFrame {
 			return
 		end
 
-		if AutoStyle=="none" or AutoStyle=="versus" then
+		if AutoStyle=="none" or AutoStyle=="versus" or #GAMESTATE:GetHumanPlayers() > 1 then
 			HandleStateChange(self, PLAYER_1)
 			HandleStateChange(self, PLAYER_2)
 		else
-			HandleStateChange(self, mpn)
+			HandleStateChange(self, GAMESTATE:GetMasterPlayerNumber())
 		end
 	end,
 
@@ -264,13 +271,22 @@ for profile in ivalues(profile_data) do
 	end
 end
 
+-- if we're fast profile switching, dim the song wheel in the background
+if SL.Global.FastProfileSwitchInProgress then
+	t[#t+1] = Def.Quad {
+		InitCommand=function(self)
+			self:FullScreen():diffuse(Color.Black):diffusealpha(0.8)
+		end
+	}
+end
+
 -- load PlayerFrames for both
-if AutoStyle=="none" or AutoStyle=="versus" then
+if AutoStyle=="none" or AutoStyle=="versus" or #GAMESTATE:GetHumanPlayers() > 1 then
 	t[#t+1] = LoadActor("PlayerFrame.lua", {Player=PLAYER_1, Scroller=scrollers[PLAYER_1], ProfileData=profile_data, Avatars=avatars})
 	t[#t+1] = LoadActor("PlayerFrame.lua", {Player=PLAYER_2, Scroller=scrollers[PLAYER_2], ProfileData=profile_data, Avatars=avatars})
 -- load only for the MasterPlayerNumber
 else
-	t[#t+1] = LoadActor("PlayerFrame.lua", {Player=mpn, Scroller=scrollers[mpn], ProfileData=profile_data, Avatars=avatars})
+	t[#t+1] = LoadActor("PlayerFrame.lua", {Player=GAMESTATE:GetMasterPlayerNumber(), Scroller=scrollers[GAMESTATE:GetMasterPlayerNumber()], ProfileData=profile_data, Avatars=avatars})
 end
 
 LoadActor("./JudgmentGraphicPreviews.lua", {af=t, profile_data=profile_data})
